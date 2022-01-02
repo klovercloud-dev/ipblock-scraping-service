@@ -10,14 +10,12 @@ import (
 	"strings"
 )
 
-
-
 var urls []string
 var ipBlocksStruct []IpBlock
 
 func GetAllCountryUrl() []string {
 	// Make HTTP request
-	response, err := http.Get("http://ipverse.net/")
+	response, err := http.Get("https://github.com/ipverse/rir-ip/tree/master/country")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,22 +34,62 @@ func GetAllCountryUrl() []string {
 	return urls
 }
 
-func GetIpv4Urls() []string  {
-	var ipV4urls []string
-	urls := GetAllCountryUrl()
-	for i:=0; i <  len(urls) ; i++{
-		if strings.Contains(urls[i], "ipv6") == false && strings.Contains(urls[i], "http") == false && strings.Contains(urls[i], "ipblocks") == true {
-			ipV4urls = append(ipV4urls, urls[i])
-			fmt.Println(urls[i])
+// GetIpUrls := TAKE COUNTRY URL && RETURN IPV4URL
+func GetIpUrls(url string) string {
+	// Make HTTP request
+	response, err := http.Get("https://github.com/" + url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer response.Body.Close()
+
+	// Create a goquery document from the HTTP response
+	document, err := goquery.NewDocumentFromReader(response.Body)
+	if err != nil {
+		log.Fatal("Error loading HTTP response body. ", err)
+	}
+
+	// Find all links and process them with the function
+	// defined earlier
+
+	var _urls []string
+	document.Find("a").Each(func(index int, element *goquery.Selection) {
+		// See if the href attribute exists on the element
+		href, exists := element.Attr("href")
+		if exists {
+			//fmt.Println(href)
+			_urls = append(_urls, href)
+		}
+	})
+
+	var finalUrl string
+	for i := 0; i < len(_urls); i++ {
+		if strings.Contains(_urls[i], "ipv4-aggregated.txt") == true {
+			finalUrl = _urls[i]
 		}
 	}
+
+	return finalUrl
+}
+
+func GetIpv4Urls() []string {
+	var ipV4urls []string
+
+	urls := GetAllCountryUrl()
+
+	for i := 0; i < len(urls); i++ {
+		if strings.Contains(urls[i], "ipverse/rir-ip/tree/master/country") == true {
+			ipV4urls = append(ipV4urls, urls[i]+"/ipv4-aggregated.txt")
+		}
+	}
+
 	return ipV4urls
 }
 
 func GetIpBlocks() []IpBlock {
 	urls := GetIpv4Urls()
-	for i := 0; i<len(urls); i++{
-		response, err := http.Get("http://ipverse.net"+urls[i])
+	for i := 0; i < len(urls); i++ {
+		response, err := http.Get("https://github.com" + urls[i])
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -80,15 +118,14 @@ func GetIpBlocks() []IpBlock {
 				temp.Cidr = ipBlock
 				countryCode := GetCountryCode(urls[i])
 				temp.Country = countryCode
-				ipBlocksStruct = append(ipBlocksStruct,temp)
+				ipBlocksStruct = append(ipBlocksStruct, temp)
 			}
 		}
 	}
 	//fmt.Println(ipBlocksStruct)
-	fmt.Println("count: ",len(ipBlocksStruct))
+	fmt.Println("count: ", len(ipBlocksStruct))
 	return ipBlocksStruct
 }
-
 
 func processElement(index int, element *goquery.Selection) {
 	// See if the href attribute exists on the element
@@ -100,5 +137,5 @@ func processElement(index int, element *goquery.Selection) {
 }
 
 func GetCountryCode(val string) string {
-	return strings.ToUpper(strings.Split(strings.Split(val, "/")[4] , ".") [0])
+	return strings.ToUpper(strings.Split(strings.Split(val, "/")[6], ".")[0])
 }
